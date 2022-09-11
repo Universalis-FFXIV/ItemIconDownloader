@@ -18,8 +18,8 @@ public class Program
 
         [Option('o', "output", Required = true, HelpText = "The path to the output directory.")]
         public string? Output { get; set; }
-        
-        [Option('c', "concurrency", Required = true, HelpText = "The maximum level of concurrency to use.")]
+
+        [Option('c', "concurrency", Default = 4, HelpText = "The maximum level of concurrency to use.")]
         public int MaxConcurrency { get; set; }
     }
 
@@ -31,9 +31,9 @@ public class Program
 
         [Option('o', "output", Required = true, HelpText = "The path to the output directory.")]
         public string? Output { get; set; }
-        
-        [Option('c', "concurrency", Required = true, HelpText = "The maximum level of concurrency to use.")]
-        public int? MaxConcurrency { get; set; }
+
+        [Option('c', "concurrency", Default = 4, HelpText = "The maximum level of concurrency to use.")]
+        public int MaxConcurrency { get; set; }
     }
 
     public static async Task Main(string[] args)
@@ -74,9 +74,9 @@ public class Program
             }
         }
 
-        var paths = await FetchPaths(items);
+        var paths = await FetchPaths(items, opts.MaxConcurrency);
         await File.WriteAllTextAsync(Path.Combine(opts.Output, "dbMapping.json"), JsonSerializer.Serialize(paths));
-        await DownloadIcons(paths, opts.Output);
+        await DownloadIcons(paths, opts.Output, opts.MaxConcurrency);
 
         return 0;
     }
@@ -122,23 +122,27 @@ public class Program
             }
         }
 
-        var paths = await FetchPaths(items);
+        var paths = await FetchPaths(items, opts.MaxConcurrency);
         await File.WriteAllTextAsync(Path.Combine(opts.Output, "dbMapping.json"), JsonSerializer.Serialize(paths));
-        await DownloadIcons(paths, opts.Output);
+        await DownloadIcons(paths, opts.Output, opts.MaxConcurrency);
 
         return 0;
     }
 
-    private static async Task<IReadOnlyDictionary<int, string>> FetchPaths(IReadOnlyDictionary<string, int> items)
+    private static async Task<IReadOnlyDictionary<int, string>> FetchPaths(IReadOnlyDictionary<string, int> items,
+        int concurrency)
     {
         var itemUrls = new Dictionary<int, string>();
+        var s = new SemaphoreSlim(concurrency, concurrency);
 
         var pages = await GetPageCount();
         var requests = Enumerable.Range(1, pages)
             .Select(async pageNumber =>
             {
                 // Fetch the next search page, retrying until the operation succeeds.
+                await s.WaitAsync();
                 var searchPage = await Retry.Do(() => Get(GetSearchUrl(pageNumber)), TimeSpan.FromSeconds(20), 100);
+                s.Release();
 
                 // Get the items table in the search results.
                 var tableNode = searchPage.DocumentNode.SelectSingleNode(
@@ -184,19 +188,25 @@ public class Program
         return itemUrls;
     }
 
-    private static async Task DownloadIcons(IReadOnlyDictionary<int, string> itemUrls, string outputPath)
+    private static async Task DownloadIcons(IReadOnlyDictionary<int, string> itemUrls, string outputPath,
+        int concurrency)
     {
         var counter = 1;
         var total = itemUrls.Count;
+        var s = new SemaphoreSlim(concurrency, concurrency);
 
         var requests = itemUrls
             .Select(async e =>
             {
                 var (id, path) = e;
+
+                await s.WaitAsync();
                 if (await DownloadIcon(id, path, outputPath))
                 {
                     Console.WriteLine($"         => DOWNLOADED: {id}, {counter}/{total}");
                 }
+
+                s.Release();
 
                 Interlocked.Increment(ref counter);
             });
