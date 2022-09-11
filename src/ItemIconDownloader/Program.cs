@@ -18,6 +18,9 @@ public class Program
 
         [Option('o', "output", Required = true, HelpText = "The path to the output directory.")]
         public string? Output { get; set; }
+        
+        [Option('c', "concurrency", Required = true, HelpText = "The maximum level of concurrency to use.")]
+        public int MaxConcurrency { get; set; }
     }
 
     [Verb("marketable", HelpText = "Export marketable item icons from the Lodestone DB.")]
@@ -28,6 +31,9 @@ public class Program
 
         [Option('o', "output", Required = true, HelpText = "The path to the output directory.")]
         public string? Output { get; set; }
+        
+        [Option('c', "concurrency", Required = true, HelpText = "The maximum level of concurrency to use.")]
+        public int? MaxConcurrency { get; set; }
     }
 
     public static async Task Main(string[] args)
