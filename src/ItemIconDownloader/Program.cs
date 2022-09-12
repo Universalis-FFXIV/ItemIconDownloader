@@ -41,7 +41,7 @@ public class Program
         await Parser.Default.ParseArguments<ExportAllOptions, ExportMarketableOptions>(args)
             .MapResult(
                 (ExportAllOptions opts) => ExportAllIcons(opts),
-                (ExportMarketableOptions opts) => Task.FromResult(0),
+                (ExportMarketableOptions opts) => ExportMarketableIcons(opts),
                 _ => Task.FromResult(1));
     }
 
@@ -81,7 +81,7 @@ public class Program
         return 0;
     }
 
-    private static async Task<int> ExportMarketableIcons(ExportAllOptions opts)
+    private static async Task<int> ExportMarketableIcons(ExportMarketableOptions opts)
     {
         if (opts.SqPack == null) throw new ArgumentNullException(nameof(opts));
         if (opts.Output == null) throw new ArgumentNullException(nameof(opts));
